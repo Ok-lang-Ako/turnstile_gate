@@ -225,6 +225,7 @@ if (isset($_GET['events'])) {
    
 }
 
+// Handle direction check request
 if (isset($_GET['check_direction']) && isset($_GET['qr_data'])) {
     $qr_data = htmlspecialchars($_GET['qr_data'], ENT_QUOTES, 'UTF-8');
     
@@ -252,6 +253,7 @@ if (isset($_GET['check_direction']) && isset($_GET['qr_data'])) {
 if (!empty($qr_data)) {
     // Sanitize the input
     $qr_data = htmlspecialchars($qr_data, ENT_QUOTES, 'UTF-8');
+    $direction = isset($_GET['direction']) ? $_GET['direction'] : 'OUT';
     
     // Check if QR code exists in authorized list
     $stmt = $conn->prepare("SELECT name, id_number, photo FROM authorized_codes WHERE qr_hash = ?");
@@ -273,24 +275,22 @@ if (!empty($qr_data)) {
         $photo = str_replace('//', '/', $photo);
     }
     
-    // Log the scan - only store QR data and status
-    $stmt = $conn->prepare("INSERT INTO scan_logs (qr_data, status) VALUES (?, ?)");
-    $stmt->bind_param("ss", $qr_data, $status);
-    $stmt->execute();
+    // Log the scan with direction
     $stmt = $conn->prepare("INSERT INTO scan_logs (qr_data, status, direction) VALUES (?, ?, ?)");
-$stmt->bind_param("sss", $qr_data, $status, $direction);
-$stmt->execute();
+    $stmt->bind_param("sss", $qr_data, $status, $direction);
+    $stmt->execute();
+
     header('Content-Type: application/json');
-echo json_encode([
-    'status' => 'success',
-    'message' => 'QR code data received',
-    'data' => $qr_data,
-    'authorized' => ($status === "Authorized"),
-    'name' => $name,
-    'id_number' => $id_number,
-    'photo' => $photo,
-    'direction' => $direction  // Add direction to response
-], JSON_UNESCAPED_SLASHES);
+    echo json_encode([
+        'status' => 'success',
+        'message' => 'QR code data received',
+        'data' => $qr_data,
+        'authorized' => ($status === "Authorized"),
+        'name' => $name,
+        'id_number' => $id_number,
+        'photo' => $photo,
+        'direction' => $direction
+    ], JSON_UNESCAPED_SLASHES);
 } else {
     // Send error response
     header('Content-Type: application/json');
@@ -302,5 +302,4 @@ echo json_encode([
 }
 
 $conn->close();
-?>
 ?>
