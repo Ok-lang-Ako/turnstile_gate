@@ -252,7 +252,7 @@ if (isset($_GET['check_direction']) && isset($_GET['qr_data'])) {
 // Handle ESP32 requests
 if (!empty($qr_data)) {
     // Sanitize the input
-    $qr_data = htmlspecialchars($qr_data, ENT_QUOTES, 'UTF-8');
+    $qr_data = htmlspecialchars($_GET['qr_data'], ENT_QUOTES, 'UTF-8');
     $direction = isset($_GET['direction']) ? $_GET['direction'] : 'OUT';
     
     // Check if QR code exists in authorized list
@@ -273,12 +273,12 @@ if (!empty($qr_data)) {
         $id_number = $row['id_number'];
         $photo = str_replace('\\', '/', $row['photo']);
         $photo = str_replace('//', '/', $photo);
+        
+        // Log the scan with direction only if authorized
+        $stmt = $conn->prepare("INSERT INTO scan_logs (qr_data, status, direction) VALUES (?, ?, ?)");
+        $stmt->bind_param("sss", $qr_data, $status, $direction);
+        $stmt->execute();
     }
-    
-    // Log the scan with direction
-    $stmt = $conn->prepare("INSERT INTO scan_logs (qr_data, status, direction) VALUES (?, ?, ?)");
-    $stmt->bind_param("sss", $qr_data, $status, $direction);
-    $stmt->execute();
 
     header('Content-Type: application/json');
     echo json_encode([
