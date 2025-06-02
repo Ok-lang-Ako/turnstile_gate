@@ -145,39 +145,44 @@ if (empty($_GET)) {
         }
 
         const cardBody = document.querySelector('.card-body');
+        let photoHtml = '';
+        
+        if (photoUrl && status === 'Authorized') {
+            photoHtml = `<img src="${photoUrl}" class="img-fluid rounded mb-3" style="max-height: 300px;" alt="Current Scan" onerror="this.style.display='none'">`;
+        }
+
         cardBody.innerHTML = `
-                    <img src="${photoUrl}" class="img-fluid rounded mb-3" style="max-height: 300px;" alt="Current Scan">
-                    ${name ? `<h3 class="text-success mb-3">${name}</h3>` : ''}
-                    <h4 class="${status === 'Authorized' ? 'text-success' : 'text-danger'} mb-3">
-                        ${status === 'Authorized' ? 'ACCESS GRANTED' : 'ACCESS DENIED'}
-                    </h4>
-                `;
+            ${photoHtml}
+            ${name ? `<h3 class="text-success mb-3">${name}</h3>` : ''}
+            <h4 class="${status === 'Authorized' ? 'text-success' : 'text-danger'} mb-3">
+                ${status === 'Authorized' ? 'ACCESS GRANTED' : 'ACCESS DENIED'}
+            </h4>
+        `;
 
         normalViewTimeout = setTimeout(function() {
             cardBody.innerHTML = `
-                        <i class="bi bi-upc-scan display-1 text-success mb-3"></i>
-                        <h2 class="text-success mb-3">WAITING FOR SCAN</h2>
-                        <div class="d-flex align-items-center justify-content-center">
-                            <div class="spinner-grow text-success me-2" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <span>System Ready</span>
-                        </div>
-                    `;
+                <i class="bi bi-upc-scan display-1 text-success mb-3"></i>
+                <h2 class="text-success mb-3">WAITING FOR SCAN</h2>
+                <div class="d-flex align-items-center justify-content-center">
+                    <div class="spinner-grow text-success me-2" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span>System Ready</span>
+                </div>
+            `;
         }, 10000);
     }
 
     startEventSource();
 
     <?php
-            if (isset($_GET['photo']) && !empty($_GET['photo'])) {
-                $name = isset($_GET['name']) ? $_GET['name'] : '';
-                $status = isset($_GET['status']) ? $_GET['status'] : 'Unauthorized';
-                $photo = isset($_GET['photo']) ? $_GET['photo'] : '';
-                echo "handlePhotoDisplay('" . htmlspecialchars($photo) . "', '" . 
-                     htmlspecialchars($name) . "', '" . htmlspecialchars($status) . "');";
-            }
-            ?>
+    if (isset($_GET['photo']) && !empty($_GET['photo'])) {
+        $name = isset($_GET['name']) ? $_GET['name'] : '';
+        $status = isset($_GET['status']) ? $_GET['status'] : 'Unauthorized';
+        echo "handlePhotoDisplay('" . htmlspecialchars($_GET['photo']) . "', '" . 
+             htmlspecialchars($name) . "', '" . htmlspecialchars($status) . "');";
+    }
+    ?>
     </script>
 </body>
 
@@ -247,28 +252,33 @@ if (!empty($qr_data)) {
         $status = "Authorized";
         $name = $row['name'];
         $id_number = $row['id_number'];
-        $photo = str_replace('\\', '/', $row['photo']);
-        $photo = str_replace('//', '/', $photo);
+        $photo = $row['photo'];
+        // Fix photo path
+        if ($photo) {
+            $photo = str_replace('\\', '/', $photo);
+            $photo = '/' . ltrim($photo, '/');
+            if (!file_exists($_SERVER['DOCUMENT_ROOT'] . $photo)) {
+                error_log("Photo file not found: " . $_SERVER['DOCUMENT_ROOT'] . $photo);
+            }
+        }
     }
     
-    // Log the scan - only store QR data and status
-    $stmt = $conn->prepare("INSERT INTO scan_logs (qr_data, status) VALUES (?, ?)");
-    $stmt->bind_param("ss", $qr_data, $status);
-    $stmt->execute();
+    // Log the scan with direction
     $stmt = $conn->prepare("INSERT INTO scan_logs (qr_data, status, direction) VALUES (?, ?, ?)");
-$stmt->bind_param("sss", $qr_data, $status, $direction);
-$stmt->execute();
+    $stmt->bind_param("sss", $qr_data, $status, $direction);
+    $stmt->execute();
+
     header('Content-Type: application/json');
-echo json_encode([
-    'status' => 'success',
-    'message' => 'QR code data received',
-    'data' => $qr_data,
-    'authorized' => ($status === "Authorized"),
-    'name' => $name,
-    'id_number' => $id_number,
-    'photo' => $photo,
-    'direction' => $direction  // Add direction to response
-], JSON_UNESCAPED_SLASHES);
+    echo json_encode([
+        'status' => 'success',
+        'message' => 'QR code data received',
+        'data' => $qr_data,
+        'authorized' => ($status === "Authorized"),
+        'name' => $name,
+        'id_number' => $id_number,
+        'photo' => $photo,
+        'direction' => $direction
+    ], JSON_UNESCAPED_SLASHES);
 } else {
     // Send error response
     header('Content-Type: application/json');
@@ -280,5 +290,4 @@ echo json_encode([
 }
 
 $conn->close();
-?>
 ?>
