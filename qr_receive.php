@@ -231,6 +231,33 @@ if (isset($_GET['events'])) {
    
 }
 
+
+
+// Handle direction check request
+if (isset($_GET['check_direction']) && isset($_GET['qr_data'])) {
+    $qr_data = htmlspecialchars($_GET['qr_data'], ENT_QUOTES, 'UTF-8');
+    
+    // Get the last recorded direction for this QR code
+    $stmt = $conn->prepare("SELECT direction FROM scan_logs WHERE qr_data = ? ORDER BY timestamp DESC LIMIT 1");
+    $stmt->bind_param("s", $qr_data);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $last_direction = "OUT";  // Default to OUT if no previous record
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $last_direction = $row['direction'];
+    }
+    
+    header('Content-Type: application/json');
+    echo json_encode([
+        'status' => 'success',
+        'last_direction' => $last_direction
+    ]);
+    exit;
+}
+
+
 // Handle ESP32 requests
 if (!empty($qr_data)) {
     // Sanitize the input
